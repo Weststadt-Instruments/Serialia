@@ -1,0 +1,47 @@
+
+name: Build macOS plugins
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: macOS ${{ matrix.arch }}
+    runs-on: macos-13
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            target: x86_64-apple-darwin
+          - arch: arm64
+            target: arm64-apple-darwin
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rack SDK
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          curl -L -o "$HOME/Rack-SDK.zip" \
+            "https://vcvrack.com/downloads/Rack-SDK-2.6.4-mac-${ARCH}.zip"
+          unzip -q "$HOME/Rack-SDK.zip" -d "$HOME"
+
+      - name: Build plugin
+        env:
+          RACK_DIR: ${{ runner.temp }}/Rack-SDK
+          CROSS_COMPILE: ${{ matrix.target }}
+        run: |
+          export RACK_DIR="$HOME/Rack-SDK"
+          make dep
+          make dist
+
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-mac-${{ matrix.arch }}
+          path: dist/*.vcvplugin
+          if-no-files-found: error
